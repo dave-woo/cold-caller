@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seminar Cold Caller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: a large "stage" where the called name appears, with the roster as a tappable attendance board beside it (stacked on phones). */
+:root {
+  --bg: #eef2f1;
+  --surface: #ffffff;
+  --ink: #18282c;
+  --muted: #5a6d71;
+  --line: #d3dcdb;
+  --accent: #f0b429;
+  --accent-ink: #2a1f00;
+  --absent: #b8423a;
+  --absent-bg: #f8e4e2;
+  --called-bg: #e2ecea;
+  --stage: #1d3a3f;
+  --stage-ink: #f4f7f6;
+  --stage-muted: #a9c2c0;
+  --focus: #1f7a8c;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101b1d; --surface: #172629; --ink: #e6eeed; --muted: #95aaa9; --line: #2b3f42;
+    --accent: #f3bd3f; --accent-ink: #231a00; --absent: #ef8d84; --absent-bg: #3a2220;
+    --called-bg: #1f3337; --stage: #0b2a2f; --stage-ink: #f4f7f6; --stage-muted: #8fb0ad;
+    --focus: #6cc3d3; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101b1d; --surface: #172629; --ink: #e6eeed; --muted: #95aaa9; --line: #2b3f42;
+  --accent: #f3bd3f; --accent-ink: #231a00; --absent: #ef8d84; --absent-bg: #3a2220;
+  --called-bg: #1f3337; --stage: #0b2a2f; --stage-ink: #f4f7f6; --stage-muted: #8fb0ad;
+  --focus: #6cc3d3; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 1.6rem; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 0.95rem; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 1.1rem; margin: 0; }
+.label { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Stage */
+.stage { background: var(--stage); color: var(--stage-ink); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.stage .label { color: var(--stage-muted); }
+.stage-top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.called-name {
+  font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 6vw, 4.4rem); line-height: 1.05;
+  min-height: 2.3em; display: flex; align-items: center; overflow-wrap: anywhere; text-wrap: balance; letter-spacing: -0.015em;
+}
+.called-name.placeholder { color: var(--stage-muted); font-weight: 500; font-size: clamp(1.4rem, 3.5vw, 2rem); }
+.called-name.spinning { color: var(--stage-muted); }
+.called-name.landed { animation: land 0.35s ease-out; }
+@keyframes land { from { transform: scale(0.94); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn-call { background: var(--accent); color: var(--accent-ink); border: none; font-family: var(--display); font-weight: 700; font-size: 1.15rem; padding: 14px 24px; border-radius: 12px; }
+.btn-call:hover { filter: brightness(1.05); }
+.btn-ghost { background: transparent; color: var(--stage-ink); border-color: rgba(255,255,255,0.28); }
+.btn-ghost:hover { border-color: var(--stage-ink); }
+.kbd { font-size: 0.8rem; color: var(--stage-muted); }
+.kbd kbd { font-family: var(--body); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 0 5px; }
+.mode { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 0.92rem; color: var(--stage-muted); }
+.mode label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; color: var(--stage-ink); }
+.progress { height: 6px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.3s; }
+
+.history { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.history ol { margin: 0; padding-left: 1.6em; display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
+.history li { color: var(--ink); }
+.history li .tag { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
+.history .empty { color: var(--muted); margin: 0; font-size: 0.95rem; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Roster */
+.roster { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.counts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.counts b { color: var(--ink); }
+.hint { font-size: 0.88rem; color: var(--muted); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border-radius: 999px; padding: 6px 12px; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px; }
+.chip.called { background: var(--called-bg); }
+.chip.called::after { content: "✓"; color: var(--muted); font-size: 0.8rem; }
+.chip.absent { background: var(--absent-bg); color: var(--absent); border-color: var(--absent); text-decoration: line-through; }
+.chip.absent::after { content: "absent"; text-decoration: none; display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+.chip.current { outline: 3px solid var(--accent); outline-offset: 1px; }
+textarea { width: 100%; min-height: 220px; font: inherit; font-size: 0.95rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+.btn-primary { background: var(--ink); color: var(--surface); border-color: var(--ink); font-weight: 700; }
+.sample-note { font-size: 0.85rem; background: var(--called-bg); border-radius: 8px; padding: 8px 10px; margin: 0; }
+.footer-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.status { font-size: 0.88rem; color: var(--muted); min-height: 1.3em; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .called-name.landed { animation: none; } .progress > span { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Seminar Cold Caller</h1>
+      <p class="sub">Paste your roster, mark who is absent, then call on students at random.</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="col-left" style="display:flex;flex-direction:column;gap:20px;min-width:0">
+      <div class="stage" aria-live="polite">
+        <div class="stage-top">
+          <span class="label" id="roundLabel">Round 1</span>
+          <span class="label" id="poolLabel"></span>
+        </div>
+        <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+        <div class="called-name placeholder" id="calledName">Press Call on someone to begin</div>
+        <div class="actions">
+          <button class="btn-call" id="callBtn" type="button">Call on someone</button>
+          <button class="btn-ghost" id="passBtn" type="button" disabled title="Return this student to the pool without counting the call">Skip, put back</button>
+          <button class="btn-ghost" id="absentNowBtn" type="button" disabled>Mark absent and redraw</button>
+        </div>
+        <div class="mode">
+          <label><input type="radio" name="mode" id="modeFair" value="fair" checked> Everyone once before repeats</label>
+          <label><input type="radio" name="mode" id="modeAny" value="any"> Fully random</label>
+          <span class="kbd">Shortcut: <kbd>Space</kbd> to call</span>
+        </div>
+      </div>
+
+      <div class="history">
+        <div class="row">
+          <h2>Called today</h2>
+          <button type="button" id="resetCallsBtn">Start a new round</button>
+        </div>
+        <ol id="historyList"></ol>
+        <p class="empty" id="historyEmpty">No one has been called yet.</p>
+      </div>
+    </section>
+
+    <aside class="roster">
+      <div class="row">
+        <h2>Roster</h2>
+        <button type="button" id="editBtn">Edit roster</button>
+      </div>
+
+      <div id="viewPane" style="display:flex;flex-direction:column;gap:12px">
+        <div class="counts">
+          <span><b id="cTotal">0</b> enrolled</span>
+          <span><b id="cPresent">0</b> present</span>
+          <span><b id="cAbsent">0</b> absent</span>
+        </div>
+        <p class="hint">Tap a name to mark them absent. Tap again to mark them present.</p>
+        <p class="sample-note" id="sampleNote" hidden>These are sample names so you can try the tool. Choose Edit roster to paste your class list.</p>
+        <div class="chips" id="chips"></div>
+        <div class="footer-tools">
+          <button type="button" id="allPresentBtn">Mark everyone present</button>
+          <button type="button" id="newSessionBtn">New class meeting</button>
+        </div>
+      </div>
+
+      <div id="editPane" hidden style="display:flex;flex-direction:column;gap:10px">
+        <label for="rosterInput" class="label">One student per line</label>
+        <textarea id="rosterInput" placeholder="Paste names here, one per line.&#10;You can paste straight from a spreadsheet column or your LMS roster."></textarea>
+        <p class="hint">Numbering, bullets, and blank lines are removed. Duplicate names are merged.</p>
+        <div class="footer-tools">
+          <button type="button" class="btn-primary" id="saveRosterBtn">Save roster</button>
+          <button type="button" id="cancelEditBtn">Cancel</button>
+        </div>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  const KEY = "cold-caller-v1";
+  const SAMPLE = ["Amara Okafor", "Ben Castillo", "Chen Wei", "Danielle Fortier", "Eli Rosenberg", "Fatima Haddad", "Gabriel Nunez", "Hana Takahashi", "Isaiah Brooks", "Jordan Lee", "Keisha Williams", "Luis Moreno"];
+
+  let state = load() || { students: SAMPLE.map(n => mk(n)), history: [], mode: "fair", round: 1, sample: true };
+  let current = null;   // id of the student most recently called
+  let spinning = false;
+
+  function mk(name) { return { id: Math.random().toString(36).slice(2, 10), name, absent: false, called: false }; }
+  function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && Array.isArray(s.students) ? s : null; } catch (e) { return null; } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  const $ = id => document.getElementById(id);
+  const byId = id => state.students.find(s => s.id === id);
+  const present = () => state.students.filter(s => !s.absent);
+
+  function randInt(n) {
+    try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; } catch (e) { return Math.floor(Math.random() * n); }
+  }
+
+  function parseRoster(text) {
+    const seen = new Set(), out = [];
+    text.split(/\r?\n/).forEach(line => {
+      let n = line.split("\t").map(c => c.trim()).filter(Boolean).join(" ");
+      n = n.replace(/^\s*(\d+[\.\)]|[-*•·])\s*/, "").replace(/\s+/g, " ").trim();
+      if (!n) return;
+      const k = n.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); out.push(n); }
+    });
+    return out;
+  }
+
+  function pool() {
+    const p = present();
+    return state.mode === "fair" ? p.filter(s => !s.called) : p;
+  }
+
+  function call() {
+    if (spinning) return;
+    const p = present();
+    if (!p.length) { flash("Everyone is marked absent. Mark someone present first."); return; }
+    let candidates = pool();
+    if (!candidates.length) {
+      // Everyone present has been called; begin a new round, avoiding an immediate repeat when possible.
+      state.students.forEach(s => s.called = false);
+      state.round += 1;
+      candidates = present().filter(s => s.id !== current || p.length === 1);
+      flash("Everyone present has been called once. Starting round " + state.round + ".");
+    }
+    const pick = candidates[randInt(candidates.length)];
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || p.length < 2) { land(pick); return; }
+
+    spinning = true; $("callBtn").disabled = true;
+    const el = $("calledName"); el.className = "called-name spinning";
+    let t = 0; const steps = 12;
+    (function tick() {
+      el.textContent = p[randInt(p.length)].name;
+      if (++t < steps) setTimeout(tick, 40 + t * 9); else { spinning = false; $("callBtn").disabled = false; land(pick); }
+    })();
+  }
+
+  function land(s) {
+    s.called = true; current = s.id;
+    state.history.unshift({ id: s.id, name: s.name, round: state.round, skipped: false });
+    const el = $("calledName"); el.className = "called-name"; void el.offsetWidth; el.className = "called-name landed";
+    el.textContent = s.name;
+    save(); render();
+  }
+
+  function pass() {
+    const s = current && byId(current); if (!s) return;
+    s.called = false;
+    const h = state.history.find(x => x.id === s.id && !x.skipped); if (h) h.skipped = true;
+    flash(s.name + " is back in the pool.");
+    current = null; resetStage(); save(); render();
+  }
+
+  function absentNow() {
+    const s = current && byId(current); if (!s) return;
+    s.absent = true; s.called = false;
+    const i = state.history.findIndex(x => x.id === s.id && !x.skipped); if (i > -1) state.history.splice(i, 1);
+    flash(s.name + " marked absent.");
+    current = null; save(); render(); call();
+  }
+
+  function resetStage() { const el = $("calledName"); el.className = "called-name placeholder"; el.textContent = "Press Call on someone to begin"; }
+
+  function toggleAbsent(id) {
+    const s = byId(id); s.absent = !s.absent;
+    if (s.absent && current === id) { current = null; resetStage(); }
+    save(); render();
+  }
+
+  let flashT;
+  function flash(msg) { $("status").textContent = msg; clearTimeout(flashT); flashT = setTimeout(() => $("status").textContent = "", 4000); }
+
+  function render() {
+    const total = state.students.length, p = present();
+    $("cTotal").textContent = total; $("cPresent").textContent = p.length; $("cAbsent").textContent = total - p.length;
+    $("sampleNote").hidden = !state.sample;
+    $("modeFair").checked = state.mode === "fair"; $("modeAny").checked = state.mode === "any";
+
+    const chips = $("chips"); chips.innerHTML = "";
+    state.students.forEach(s => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip" + (s.absent ? " absent" : s.called ? " called" : "") + (s.id === current ? " current" : "");
+      b.textContent = s.name; b.setAttribute("aria-pressed", s.absent ? "true" : "false");
+      b.title = s.absent ? "Mark present" : "Mark absent";
+      b.onclick = () => toggleAbsent(s.id);
+      chips.appendChild(b);
+    });
+
+    const calledCount = p.filter(s => s.called).length;
+    if (state.mode === "fair") {
+      $("roundLabel").textContent = "Round " + state.round;
+      $("poolLabel").textContent = calledCount + " of " + p.length + " present called";
+      $("progressBar").style.width = p.length ? (calledCount / p.length * 100) + "%" : "0";
+    } else {
+      $("roundLabel").textContent = "Fully random";
+      $("poolLabel").textContent = p.length + " present";
+      $("progressBar").style.width = "0";
+    }
+
+    const list = $("historyList"); list.innerHTML = "";
+    state.history.forEach((h, i) => {
+      const li = document.createElement("li");
+      li.value = state.history.length - i;
+      li.textContent = h.name;
+      if (h.skipped || state.round > 1) {
+        const t = document.createElement("span"); t.className = "tag";
+        t.textContent = [h.skipped ? "skipped" : "", state.round > 1 ? "round " + h.round : ""].filter(Boolean).join(", ");
+        li.appendChild(t);
+      }
+      list.appendChild(li);
+    });
+    $("historyEmpty").hidden = state.history.length > 0;
+    $("passBtn").disabled = !current; $("absentNowBtn").disabled = !current;
+    $("callBtn").disabled = spinning || !p.length;
+  }
+
+  // Edit roster
+  function openEdit() {
+    $("rosterInput").value = state.sample ? "" : state.students.map(s => s.name).join("\n");
+    $("viewPane").hidden = true; $("editPane").hidden = false; $("editBtn").hidden = true;
+    $("rosterInput").focus();
+  }
+  function closeEdit() { $("viewPane").hidden = false; $("editPane").hidden = true; $("editBtn").hidden = false; }
+  function saveRoster() {
+    const names = parseRoster($("rosterInput").value);
+    if (!names.length) { flash("Paste at least one name, one per line."); return; }
+    const old = new Map(state.students.map(s => [s.name.toLowerCase(), s]));
+    state.students = names.map(n => old.get(n.toLowerCase()) && !state.sample ? Object.assign(old.get(n.toLowerCase()), { name: n }) : mk(n));
+    if (state.sample) { state.history = []; state.round = 1; }
+    const ids = new Set(state.students.map(s => s.id));
+    state.history = state.history.filter(h => ids.has(h.id));
+    if (current && !ids.has(current)) current = null;
+    state.sample = false;
+    closeEdit(); if (!current) resetStage(); save(); render();
+    flash("Roster saved with " + names.length + " students.");
+  }
+
+  // Wire up
+  $("callBtn").onclick = call;
+  $("passBtn").onclick = pass;
+  $("absentNowBtn").onclick = absentNow;
+  $("editBtn").onclick = openEdit;
+  $("cancelEditBtn").onclick = closeEdit;
+  $("saveRosterBtn").onclick = saveRoster;
+  $("resetCallsBtn").onclick = () => {
+    state.students.forEach(s => s.called = false); state.round += 1; current = null; resetStage(); save(); render();
+    flash("New round started. Everyone present is back in the pool.");
+  };
+  $("allPresentBtn").onclick = () => { state.students.forEach(s => s.absent = false); save(); render(); };
+  $("newSessionBtn").onclick = () => {
+    state.students.forEach(s => { s.absent = false; s.called = false; });
+    state.history = []; state.round = 1; current = null; resetStage(); save(); render();
+    flash("Ready for a new class meeting. Attendance and call history cleared; roster kept.");
+  };
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.onchange = () => { state.mode = r.value; save(); render(); });
+  document.addEventListener("keydown", e => {
+    if (e.code !== "Space" || e.repeat) return;
+    const t = e.target.tagName;
+    if (t === "TEXTAREA" || t === "INPUT" || t === "BUTTON") return;
+    e.preventDefault(); call();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
